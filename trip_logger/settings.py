@@ -19,10 +19,12 @@ INSTALLED_APPS = [
     'django_extensions',
     'rest_framework',
     'channels',  # Django Channels
+    'corsheaders',
     'api',  # Your application
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -47,6 +49,12 @@ TEMPLATES = [
         },
     },
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',  # ✅ Ensure JWT is used
+    ),
+}
 
 # Define ASGI application for Django Channels
 ASGI_APPLICATION = "trip_logger.asgi.application"
@@ -76,8 +84,22 @@ DATABASES = {
     }
 }
 
+
+# ✅ CORS Configuration (Allow frontend)
+CORS_ALLOW_ALL_ORIGINS = False  # ❌ Not recommended for production
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # ✅ Allow frontend
+]
+CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+CORS_ALLOW_HEADERS = ["content-type", "authorization", "x-requested-with"]
+
 # Security Settings
 DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"  # Set True for local dev
+
+# Enable Django to serve static files in development
+if DEBUG:
+    import mimetypes
+    mimetypes.add_type("text/javascript", ".js", True)
 
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
 

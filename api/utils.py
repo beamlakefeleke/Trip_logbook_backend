@@ -8,40 +8,35 @@ from api import models
 
 # 📍 API Key for Google Maps / OpenStreetMap (Set in settings.py)
 MAPS_API_KEY = getattr(settings, "MAPS_API_KEY", None)
+NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+OSRM_ROUTE_URL = "http://router.project-osrm.org/route/v1/driving/"
 
 
 def calculate_distance(pickup, dropoff):
-    """
-    Calculates the road distance (in miles) between pickup and dropoff using Google Maps API.
-    If Google API fails, fall back to geopy (approximate distance).
-    """
-    if MAPS_API_KEY:
-        try:
-            url = f"https://maps.googleapis.com/maps/api/distancematrix/json?origins={pickup}&destinations={dropoff}&key={MAPS_API_KEY}"
-            response = requests.get(url).json()
-            if response['status'] == 'OK':
-                distance = response["rows"][0]["elements"][0]["distance"]["value"] / 1609.34  # Convert meters to miles
-                return round(distance, 2)
-        except Exception as e:
-            print(f"Google Maps API Error: {e}")
+    """Calculates road distance using OSRM API or falls back to geopy."""
+    pickup_coords = get_coordinates(pickup)
+    dropoff_coords = get_coordinates(dropoff)
 
-    # Fallback: Use geopy (approximate distance)
-    try:
-        pickup_coords = get_coordinates(pickup)
-        dropoff_coords = get_coordinates(dropoff)
-        return round(geodesic(pickup_coords, dropoff_coords).miles, 2)
-    except Exception as e:
-        print(f"Geopy Error: {e}")
+    if not pickup_coords or not dropoff_coords:
         return None
+
+    try:
+        url = f"{OSRM_ROUTE_URL}{pickup_coords[1]},{pickup_coords[0]};{dropoff_coords[1]},{dropoff_coords[0]}?overview=false"
+        response = requests.get(url).json()
+        if response.get("code") == "Ok":
+            distance = response["routes"][0]["distance"] / 1609.34  # Convert meters to miles
+            return round(distance, 2)
+    except Exception as e:
+        print(f"OSRM Routing API Error: {e}")
+
+    # Fallback: geopy (straight-line distance)
+    return round(geodesic(pickup_coords, dropoff_coords).miles, 2)
 
 
 def get_coordinates(location):
-    """
-    Convert a location (city, state) into latitude/longitude using OpenStreetMap.
-    """
+    """Convert a location (city, state) into latitude/longitude using OpenStreetMap."""
     try:
-        url = f"https://nominatim.openstreetmap.org/search?q={location}&format=json"
-        response = requests.get(url).json()
+        response = requests.get(NOMINATIM_URL, params={"q": location, "format": "json"}).json()
         if response:
             return float(response[0]["lat"]), float(response[0]["lon"])
     except Exception as e:
